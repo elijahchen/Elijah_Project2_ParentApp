@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ParentApp</string>
+    <string name="radius">Radius</string>
+    <string name="username">Username</string>
+    <string name="latitude">Latitude</string>
+    <string name="longitude">Longitude</string>
+</resources>
