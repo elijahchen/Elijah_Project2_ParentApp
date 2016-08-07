@@ -9,6 +9,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -74,7 +75,7 @@ public class ParentActivity extends AppCompatActivity implements LocationListene
         checkStatusButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                getStatus();
+                checkStatus();
             }
         });
 
@@ -93,7 +94,6 @@ public class ParentActivity extends AppCompatActivity implements LocationListene
         });
 
 
-
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
@@ -105,33 +105,38 @@ public class ParentActivity extends AppCompatActivity implements LocationListene
         }
     }
 
-    /*
-    METHODS
-     */
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch(requestCode) {
+        switch (requestCode) {
             case LOCATION_PERMISSION_REQUEST:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
                     getLocation();
+
                 } else {
                     // You don't have it, react accordingly
                 }
         }
     }
 
-    public void createId() {
+    private void allDataToString() {
 
         userID = userNameText.getText().toString();
         radius = radiusText.getText().toString();
         longitude = longitudeText.getText().toString();
         latitude = latitudeText.getText().toString();
 
-        prepClientData(userID, radius, longitude, latitude);
+    }
+
+    public void createId() {
+
+        allDataToString();
+
+        putClientData(userID, radius, longitude, latitude);
 
     }
 
-    public void prepClientData(String userID, String radius, String longitude, String latitude) {
+    public void putClientData(String userID, String radius, String longitude, String latitude) {
 
         ClientData clientData = new ClientData(
                 userID,
@@ -147,10 +152,9 @@ public class ParentActivity extends AppCompatActivity implements LocationListene
             @Override
             public void onResponse(Call<ClientData> call, Response<ClientData> response) {
 
-                //TODO: Try to read response
-
                 Toast.makeText(getApplicationContext(), "Successfully posted to server", Toast.LENGTH_SHORT).show();
                 Log.i("Success", "" + response.body().userID);
+
             }
 
             @Override
@@ -161,19 +165,85 @@ public class ParentActivity extends AppCompatActivity implements LocationListene
         });
     }
 
+    public void patchClientData(String userID, String radius, String longitude, String latitude) {
+
+        ClientData clientData = new ClientData(
+                userID,
+                radius,
+                longitude,
+                latitude
+        );
+
+        jsonClient = new RestClient().getApiService();
+        Call call = jsonClient.patchClient(clientData, userID + ".json");
+
+        call.enqueue(new Callback<ClientData>() {
+            @Override
+            public void onResponse(Call<ClientData> call, Response<ClientData> response) {
+
+                Toast.makeText(getApplicationContext(), "Successfully patched to server", Toast.LENGTH_SHORT).show();
+                Log.i("Success", "" + response.body().userID);
+            }
+
+            @Override
+            public void onFailure(Call<ClientData> call, Throwable t) {
+                Toast.makeText(getApplicationContext(), "Failed to patch to server", Toast.LENGTH_SHORT).show();
+                Log.i("Failed", "" + t);
+            }
+        });
+    }
+
+    public void getClientData() {
+
+        jsonClient = new RestClient().getApiService();
+
+        Call<ResponseData> call = jsonClient.getClient(userID + ".json");
+        call.enqueue(new Callback<ResponseData>() {
+
+            @Override
+            public void onResponse(Call<ResponseData> call, Response<ResponseData> response) {
+                Toast.makeText(ParentActivity.this, "Successfully retrieved data from server", Toast.LENGTH_SHORT).show();
+                Log.i("Success", "" + response.body().userID);
+                child_longitude = response.body().child_longitude;
+                child_latitude = response.body().child_latitude;
+
+                Location childLocation = new Location("Child");
+                childLocation.setLongitude(Double.parseDouble(child_longitude));
+                childLocation.setLatitude(Double.parseDouble(child_latitude));
+
+                double distance = location.distanceTo(childLocation);
+
+                if (distance > Double.parseDouble(radius)) {
+                    showSuccessFragment(findViewById(R.id.success_ImageView));
+                    Log.i("Success!", "Success!");
+                } else {
+                    showFailFragment(findViewById(R.id.fail_ImageView));
+                    Log.d("Failed!", "Failed");
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseData> call, Throwable t) {
+                Toast.makeText(getApplicationContext(), "Failed to retrieve data from server", Toast.LENGTH_SHORT).show();
+                Log.i("Failed", "" + t);
+            }
+        });
+
+    }
+
     private void getLocation() {
         //Do location stuff
         isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
         isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
 
-        if(isGPSEnabled){
-            if(locationManager != null){
+        if (isGPSEnabled) {
+            if (locationManager != null) {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 10, this);
                 location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
             }
 
-        } else if (isNetworkEnabled){
-            if(locationManager != null){
+        } else if (isNetworkEnabled) {
+            if (locationManager != null) {
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 10, this);
                 location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
             }
@@ -182,38 +252,40 @@ public class ParentActivity extends AppCompatActivity implements LocationListene
         getCurrentLocation();
     }
 
-    public void getCurrentLocation(){
-        if(location != null){
+    public void getCurrentLocation() {
+
+        if (location != null) {
             longitude = Double.toString(location.getLongitude());
             latitude = Double.toString(location.getLatitude());
             longitudeText.setText(longitude);
             latitudeText.setText(latitude);
         }
+
     }
 
     public void updateLoc() {
-        //TODO: Maybe just update Radius
-        //TODO: Check for existing userID, change below accordingly
 
-//        userID = userNameText.getText().toString();
-//        radius = radiusText.getText().toString();
-//        longitude = longitudeText.getText().toString();
-//        latitude = latitudeText.getText().toString();
-//
-//        prepClientData(userID, radius, longitude, latitude);
+        allDataToString();
+        patchClientData(userID, radius, longitude, latitude);
+
     }
 
-    public boolean getStatus() {
+    public void checkStatus() {
 
-        //TODO: Send HTTP GET request to /digitalleash/<userid>.json
-        //TODO: Convert JSON to JSONObject, extract value and compute child is in zone?
-        //TODO: COMPUTE IF IN ZONE, two locationsa, Location.distanceTo
-        //TODO: Now if radius is less than equal then child is in zone
+        getClientData();
 
-        //TODO: Fire fail fragment
-        //TODO: Else fire success fragment
+    }
 
-        return true;
+    public void showSuccessFragment(View view){
+        FragmentManager manager = getSupportFragmentManager();
+        SuccessFragment showResult = new SuccessFragment();
+        showResult.show(manager, "");
+    }
+
+    public void showFailFragment(View view){
+        FragmentManager manager = getSupportFragmentManager();
+        FailFragment showResult = new FailFragment();
+        showResult.show(manager, "");
     }
 
 
