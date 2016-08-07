@@ -13,7 +13,7 @@ import retrofit2.http.Path;
 public interface JSONData {
 
     @GET("{userID}")
-    Call<ClientData> getLocation(@Path("userID") String userId);
+    Call<ResponseData> getClient(@Path("userID") String userId);
 
     @PUT("{userID}")
     Call<ClientData> putClient(@Body ClientData clientId,
